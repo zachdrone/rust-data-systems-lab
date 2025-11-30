@@ -1,0 +1,9 @@
+[workspace]
+members = [
+  "crates/pipeline-core",
+  "crates/arrow-ops",
+  "crates/etl-engine",
+  "crates/fusion-extensions",
+]
+
+resolver = "2"
