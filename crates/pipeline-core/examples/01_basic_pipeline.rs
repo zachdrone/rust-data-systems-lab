@@ -1,6 +1,6 @@
-use pipeline_core::pipeline;
+use pipeline_core::basic_pipeline;
 
 #[tokio::main]
 async fn main() {
-    pipeline().await
+    basic_pipeline::pipeline().await
 }
