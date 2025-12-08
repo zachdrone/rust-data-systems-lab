@@ -4,4 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-arrow = "57.1.0"
+arrow-array = "57.1"
+arrow-schema = "57.1"
+arrow-buffer = "57.1"
