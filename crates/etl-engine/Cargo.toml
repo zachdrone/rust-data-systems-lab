@@ -4,3 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+tokio = { version = "1", features = ["full"] }
+arrow-array = "57.1"
+arrow-schema = "57.1"
+arrow-buffer = "57.1"
+arrow-csv = "57.1"
+futures = "0.3"
+arrow-ops = { path = "../arrow-ops" }
+arrow-json = "57.1"
