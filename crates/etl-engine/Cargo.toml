@@ -13,3 +13,5 @@ futures = "0.3"
 arrow-ops = { path = "../arrow-ops" }
 arrow-json = "57.1"
 object_store = { version = "0.12.3", features = ["aws"] }
+parquet = { version = "57.1.0", features = ["async", "object_store"] }
+anyhow = "1.0.99"

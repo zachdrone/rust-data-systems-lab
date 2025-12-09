@@ -2,9 +2,12 @@ use arrow_array::{Int64Array, RecordBatch};
 use arrow_csv::ReaderBuilder;
 use arrow_json::writer::LineDelimitedWriter;
 use arrow_ops::transforms::{add_normalized_col, normalize_i64};
-use arrow_schema::{DataType, Field, Schema};
+use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use object_store::local::LocalFileSystem;
 use object_store::{ObjectStore, path::Path};
+use parquet::arrow::async_writer::{AsyncArrowWriter, ParquetObjectWriter};
+use parquet::basic::{Compression, ZstdLevel};
+use parquet::file::properties::WriterProperties;
 use std::fs::File;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -68,7 +71,7 @@ async fn normalize(tx: mpsc::Sender<RecordBatch>, mut rx: mpsc::Receiver<RecordB
     }
 }
 
-async fn write_output(mut rx: mpsc::Receiver<RecordBatch>) {
+async fn write_json(mut rx: mpsc::Receiver<RecordBatch>) {
     let store: Arc<dyn ObjectStore> = Arc::new(LocalFileSystem::new_with_prefix("./").unwrap());
     while let Some(batch) = rx.recv().await {
         let mut buffer = Vec::new();
@@ -79,6 +82,38 @@ async fn write_output(mut rx: mpsc::Receiver<RecordBatch>) {
 
         let path = Path::from("normed_output.json");
         store.put(&path, buffer.into()).await.unwrap();
+    }
+}
+
+async fn write_parquet(mut rx: mpsc::Receiver<RecordBatch>) {
+    let store: Arc<dyn ObjectStore> = Arc::new(LocalFileSystem::new_with_prefix("./").unwrap());
+    let props = WriterProperties::builder()
+        .set_compression(Compression::ZSTD(ZstdLevel::default()))
+        .set_dictionary_enabled(true)
+        .build();
+    let path = Path::from("normed_output.parquet");
+    let make_writer = move |store: &Arc<dyn ObjectStore>,
+                            schema: SchemaRef|
+          -> Result<AsyncArrowWriter<ParquetObjectWriter>, anyhow::Error> {
+        let object_store_writer = ParquetObjectWriter::new(store.clone(), path.clone());
+        let writer = AsyncArrowWriter::try_new(object_store_writer, schema, Some(props.clone()))?;
+        Ok(writer)
+    };
+
+    let mut writer: Option<AsyncArrowWriter<ParquetObjectWriter>> = None;
+    while let Some(batch) = rx.recv().await {
+        if writer.is_none() {
+            let w = make_writer(&store.clone(), batch.schema_ref().clone()).unwrap();
+            writer = Some(w)
+        }
+
+        if let Some(w) = writer.as_mut() {
+            w.write(&batch).await.unwrap();
+        }
+    }
+
+    if let Some(w) = writer {
+        w.close().await.unwrap();
     }
 }
 
@@ -100,7 +135,7 @@ async fn main() {
         raw_tx,
     ));
     let normalizer = tokio::spawn(normalize(norm_tx, raw_rx));
-    let writer = tokio::spawn(write_output(norm_rx));
+    let writer = tokio::spawn(write_parquet(norm_rx));
 
     let _ = tokio::join!(reader, normalizer, writer);
 }
