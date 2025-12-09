@@ -41,8 +41,8 @@ async fn normalize(tx: mpsc::Sender<RecordBatch>, mut rx: mpsc::Receiver<RecordB
 }
 
 async fn write_output(mut rx: mpsc::Receiver<RecordBatch>) {
+    let file = File::create("normed_output.json").unwrap();
     while let Some(batch) = rx.recv().await {
-        let file = File::create("normed_output.json").unwrap();
         let mut writer = LineDelimitedWriter::new(&file);
         writer.write_batches(&[&batch]).unwrap();
     }
