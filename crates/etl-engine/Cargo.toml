@@ -12,3 +12,4 @@ arrow-csv = "57.1"
 futures = "0.3"
 arrow-ops = { path = "../arrow-ops" }
 arrow-json = "57.1"
+object_store = { version = "0.12.3", features = ["aws"] }

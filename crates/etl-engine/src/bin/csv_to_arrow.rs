@@ -3,7 +3,10 @@ use arrow_csv::ReaderBuilder;
 use arrow_json::writer::LineDelimitedWriter;
 use arrow_ops::transforms::{add_normalized_col, normalize_i64};
 use arrow_schema::{DataType, Field, Schema};
+use object_store::local::LocalFileSystem;
+use object_store::{ObjectStore, path::Path};
 use std::fs::File;
+use std::io::Cursor;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
@@ -14,6 +17,28 @@ async fn read_csv(filepath: String, schema: Arc<Schema>, tx: mpsc::Sender<Record
         let csv = ReaderBuilder::new(schema)
             .with_header(true)
             .build(file)
+            .unwrap();
+
+        for batch in csv {
+            tx.blocking_send(batch.unwrap()).unwrap();
+        }
+    })
+    .await
+    .unwrap();
+}
+
+async fn read_csv_store(filepath: String, schema: Arc<Schema>, tx: mpsc::Sender<RecordBatch>) {
+    let store: Arc<dyn ObjectStore> = Arc::new(LocalFileSystem::new_with_prefix("./").unwrap());
+
+    let location = Path::from(filepath);
+
+    let bytes = store.get(&location).await.unwrap().bytes().await.unwrap();
+    let cursor = Cursor::new(bytes);
+
+    tokio::task::spawn_blocking(move || {
+        let csv = ReaderBuilder::new(schema)
+            .with_header(true)
+            .build(cursor)
             .unwrap();
 
         for batch in csv {
@@ -44,10 +69,16 @@ async fn normalize(tx: mpsc::Sender<RecordBatch>, mut rx: mpsc::Receiver<RecordB
 }
 
 async fn write_output(mut rx: mpsc::Receiver<RecordBatch>) {
-    let file = File::create("normed_output.json").unwrap();
+    let store: Arc<dyn ObjectStore> = Arc::new(LocalFileSystem::new_with_prefix("./").unwrap());
     while let Some(batch) = rx.recv().await {
-        let mut writer = LineDelimitedWriter::new(&file);
-        writer.write_batches(&[&batch]).unwrap();
+        let mut buffer = Vec::new();
+        {
+            let mut writer = LineDelimitedWriter::new(&mut buffer);
+            writer.write_batches(&[&batch]).unwrap();
+        }
+
+        let path = Path::from("normed_output.json");
+        store.put(&path, buffer.into()).await.unwrap();
     }
 }
 
@@ -63,7 +94,7 @@ async fn main() {
         Field::new("pace_min_per_mile", DataType::Float32, false),
     ]));
 
-    let reader = tokio::spawn(read_csv(
+    let reader = tokio::spawn(read_csv_store(
         "running_data.csv".to_owned(),
         schema.clone(),
         raw_tx,
