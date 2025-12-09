@@ -60,15 +60,9 @@ async fn main() {
         Field::new("pace_min_per_mile", DataType::Float32, false),
     ]));
 
-    tokio::join!(
-        async move {
-            read_csv("running_data.csv", schema.clone(), raw_tx.clone()).await;
-            drop(raw_tx);
-        },
-        async move {
-            normalize(norm_tx.clone(), raw_rx).await;
-            drop(norm_tx);
-        },
-        write_output(norm_rx),
-    );
+    let reader = tokio::spawn(read_csv("running_data.csv", schema.clone(), raw_tx));
+    let normalizer = tokio::spawn(normalize(norm_tx, raw_rx));
+    let writer = tokio::spawn(write_output(norm_rx));
+
+    let _ = tokio::join!(reader, normalizer, writer);
 }
