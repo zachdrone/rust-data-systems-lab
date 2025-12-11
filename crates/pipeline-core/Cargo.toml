@@ -6,4 +6,6 @@ edition = "2024"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"
+fusion-extensions = { path = "../fusion-extensions/" }
+datafusion = "51.0.0"
 
