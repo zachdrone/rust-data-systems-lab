@@ -102,16 +102,6 @@ An end-to-end example using DataFusion plus the custom UDF from
 This shows how the lower-level pieces (Arrow transforms, UDF wiring, async IO)
 can be pulled together into a simple, but realistic, analytical pipeline.
 
----
-
-## Purpose
-
-This repository exists as a practical sandbox for exploring:
-
-- Arrow’s columnar memory structures  
-- DataFusion’s execution engine and extension points  
-- How data flows through pipelines in a Rust-based system  
-
 #### `chunked_file_pipeline.rs`
 
 A streaming file pipeline built around CSV text:
@@ -147,3 +137,12 @@ It uses `tokio::sync::mpsc` and `join_all` to fan out producers, run a single
 transformer, and drain everything in a sink. There’s also a small `add` helper
 with a unit test, just to keep something trivial under test.
 
+---
+
+## Purpose
+
+This repository exists as a practical sandbox for exploring:
+
+- Arrow's columnar memory structures  
+- DataFusion’s execution engine and extension points  
+- How data flows through pipelines in a Rust-based system  
